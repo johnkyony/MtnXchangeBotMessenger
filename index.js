@@ -5,7 +5,7 @@ const bodyParser = require('body-parser')
 const request = require('request')
 const app = express()
 const pageToken = "EAATIRqyUi3ABAAfZAkMbsAEZAfTRb6ZCtlwTDytsJxehcjIL2O40Hv88pSIOVF4wBFvpfQVIbPURPjI6lAg141tRZBLlGnoArhz0lSUrwW8NjF9IAskdCfKPOk0nl0NfsDuakEZA9MUB2dTHXJ9PxvLwUxdOpZC58mr0lZB4GTF1QZDZD"
-
+const axios = require('axios')
 
 app.set('port' , (process.env.PORT || 8080))
 
@@ -85,9 +85,34 @@ function handleMessage(sender_psid , received_message){
 	// check if the message contains text 
 	if(received_message.text){
 		//create the payload for a basic text message 
+
 		
 		response = {
-			"text": `You sent the message: "${received_message.text}". Now send me an image!`
+			"attachment": {
+				"type": "template",
+				"payload": {
+				"template_type":"button",
+				"text": "Hey I am Xchange bot , which exchange rate would you like to see",
+				"buttons":[
+					{
+						"type": "postback",
+						"title": "ZAR/USD",
+						"payload": "USDZAR"
+					},{
+						"type": "postback",
+						"title": "ZAR/EUR",
+						"payload": "USDEUR"
+					},{
+						"type":"postback",
+			            "title":"More",
+			            "payload":"More"
+						
+					}
+					]
+				}
+			}
+			
+			
 		}
 		
 		
@@ -127,17 +152,85 @@ function handleMessage(sender_psid , received_message){
 
 //handles messaging_postbacks events 
 
-function handlePostback(sender_psid , received_postback) {
+async function handlePostback(sender_psid , received_postback) {
 	let response 
 	
+	
+	//the converted rate 
+	let convertedRate 
 	// get the payload for the postback 
 	let payload = received_postback.payload
 	
+	//axios get the realtime rates 
+	
+	
+	
 	// set the response based on the postback payload
-	if(payload === 'yes'){
-		response = {"text": "Thanks!"}
-	}else if( payload === 'no'){
-		response = {"text": "Oops , try sending another image "}
+	if(payload.startsWith("USD") === true){
+		const currencyPair = payload
+		 
+	  const apiData =	await axios.get('http://apilayer.net/api/live?access_key=dc06fa249f2ea848a27bc0dd50949302&currencies=EUR,GBP,JPY,ZAR')
+	 
+	  const quotes = Object.entries(apiData.data.quotes)
+	 
+	  console.log(quotes)
+	  
+	  const [pair , rate] = quotes.find(quote => {
+	  	const [pair , rate] = quote
+	  	return pair === currencyPair
+	  })
+	  
+	  const [basePair , baseRate] = quotes.find(quote => {
+	  	const [basePair , baseRate] = quote
+	  	return basePair === 'USDZAR'
+	  })
+	  
+	  
+	   	if (currencyPair != 'USDZAR') {
+	 		convertedRate = baseRate / rate
+	 	} else {
+	 		convertedRate = rate
+	 	}
+	 	console.log(convertedRate) 
+	 	response = {"text": "R "+ convertedRate.toFixed(2)}
+	 	
+	 
+	
+	
+	  
+	
+	}else if( payload === 'More'){
+		response = {
+			"attachment": {
+				"type": "template",
+				"payload": {
+				"template_type":"button",
+				"text": "Here are more currencies to choose from",
+				"buttons":[
+					{
+						"type": "postback",
+						"title": "ZAR/JPY",
+						"payload": "USDJPY"
+					},{
+						"type": "postback",
+						"title": "ZAR/GBP",
+						"payload": "USDGBP"
+					},{
+						"type":"postback",
+			            "title":"Exit",
+			            "payload":"Exit"
+						
+					}
+					]
+				}
+			}
+			
+			
+		}
+	}else if(payload === 'Exit'){
+		response = {
+			"text": "Thanks , please come again"
+		}
 	}
 	
 	//Send the message to acknowledge the postback
@@ -148,6 +241,7 @@ function handlePostback(sender_psid , received_postback) {
 function callSendApi(sender_psid , response){
 	
 	// Construct the message body 
+	console.log(response)
 	
 	let request_body = {
 		"recipient": {
